@@ -44,6 +44,23 @@ def set_secure_headers(response):
 def index():
     return render_template("index.html")
 
+@app.route('/add_token', methods=['POST'])
+def add_token():
+    new_data = request.get_json()
+    if not new_data:
+        return jsonify({"error": "Aucune donnée reçue"}), 400
+
+    try:
+        with open('product_catalog.json', 'r+') as f:
+            data = json.load(f)
+            data.update(new_data)
+            f.seek(0)
+            json.dump(data, f, indent=2)
+            f.truncate()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/unlock")
 def unlock():
     token = request.args.get("token", "")
