@@ -1,5 +1,6 @@
 
-from urllib.parse import urlparse from flask import Flask, request, render_template, make_response, redirect
+from urllib.parse import urlparse
+from flask import Flask, request, render_template, make_response, redirect
 import json, hashlib, time
 from datetime import datetime, timedelta
 
