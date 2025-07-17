@@ -1,5 +1,5 @@
 
-from flask import Flask, request, render_template, make_response, redirect
+from urllib.parse import urlparse from flask import Flask, request, render_template, make_response, redirect
 import json, hashlib, time
 from datetime import datetime, timedelta
 
@@ -61,16 +61,48 @@ def add_token():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/unlock")
+@app.route('/unlock', methods=['GET', 'POST'])
 def unlock():
-    token = request.args.get("token", "")
-    ip = request.remote_addr
-    link = is_token_valid(token, ip)
-    if not link:
-        return render_template("index.html", error="Invalid or expired token"), 403
-    resp = make_response(render_template("unlock.html", link=link))
-    resp.set_cookie("auth", hash_token(token), httponly=True, max_age=3600)
-    return resp
+    if request.method == 'POST':
+        submitted_token = request.form.get('token', '').strip()
+        client_ip = request.remote_addr
+        referer = request.headers.get('Referer', '')
+
+        if not submitted_token:
+            return render_template('unlock.html', error="Code requis.")
+
+        with open('product_catalog.json', 'r') as f:
+            catalog = json.load(f)
+
+        hashed_submitted = hashlib.sha256(submitted_token.encode()).hexdigest()
+
+        for entry in catalog:
+            if entry['hashed_token'] == hashed_submitted:
+                # Vérifie domaine autorisé (si "url" est présent)
+                token_url = entry.get('url')
+                if token_url:
+                    domain_expected = urlparse(token_url).netloc
+                    domain_actual = urlparse(referer).netloc
+                    if domain_expected != domain_actual:
+                        return render_template('unlock.html', error="Ce site n'est pas autorisé.")
+
+                # Vérifie et enregistre IP
+                if 'ip' not in entry:
+                    entry['ip'] = client_ip
+                    with open('product_catalog.json', 'w') as f:
+                        json.dump(catalog, f, indent=2)
+                elif entry['ip'] != client_ip:
+                    return render_template('unlock.html', error="Ce code est déjà utilisé sur un autre réseau.")
+
+                # Tout est bon : set-cookie et redirect
+                response = make_response(redirect('/'))
+                duration = entry.get("duration_seconds", 3600)
+                response.set_cookie('access_token', submitted_token, max_age=duration, httponly=True)
+                return response
+
+        return render_template('unlock.html', error="Code invalide.")
+    
+    return render_template('unlock.html')
 
 if __name__ == "__main__":
     app.run(debug=True)
