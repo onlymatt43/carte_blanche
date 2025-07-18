@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🔐 Création de token sécurisé</title>
+  <style>
+    body { background:#333; color:#fff; font-family:sans-serif; padding:20px; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; font-size: 1em; }
+    pre { background:#111; padding:10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>🔐 Création de token sécurisé</h2>
+
+  <label>Code cadeau à fournir (ex: ABC123):</label><br>
+  <input type="text" id="code" placeholder="Code visible"><br>
+
+  <label>Lien de destination:</label><br>
+  <input type="text" id="link" placeholder="https://exemple.com/unlock"><br>
+
+  <label>Durée (minutes):</label><br>
+  <input type="number" id="duration" value="10"><br>
+
+  <button id="generateBtn">Générer le Token</button>
+
+  <strong>Code à donner :</strong>
+  <pre id="plainCode"></pre><button onclick="copyCode()">📋 Copier le code</button>
+
+  <strong>Iframe généré :</strong>
+  <pre id="iframeOutput"></pre><button onclick="copyIframe()">📋 Copier l’iframe</button>
+
+  <strong>JSON envoyé :</strong>
+  <pre id="jsonOutput"></pre>
+
+<script>
+async function generateSHA256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  const code = document.getElementById("code").value.trim();
+  const link = document.getElementById("link").value.trim();
+  const durationMinutes = parseInt(document.getElementById("duration").value.trim());
+  const duration = durationMinutes;
+
+  if (!code || !link || isNaN(duration)) {
+    alert("Tous les champs sont obligatoires.");
+    return;
+  }
+
+  const hashedToken = await generateSHA256(code);
+
+  const payload = {
+    token: hashedToken,
+    link,
+    duration,
+    code
+  };
+
+  try {
+    const response = await fetch("/add_token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const iframeCode = `<iframe src="https://carte-blanche.onrender.com/unlock?token=${hashedToken}" width="100%" height="100%" style="border:none; min-height:100vh;"></iframe>`;
+
+    document.getElementById("plainCode").textContent = code;
+    document.getElementById("iframeOutput").textContent = iframeCode;
+    document.getElementById("jsonOutput").textContent = JSON.stringify(payload, null, 2);
+
+  } catch (err) {
+    alert("Erreur d’envoi vers le serveur: " + err.message);
+  }
+});
+
+function copyCode() {
+  const code = document.getElementById("plainCode").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    alert("Code copié !");
+  }).catch(err => {
+    alert("Erreur lors de la copie : " + err);
+  });
+}
+
+function copyCode() {
+  const code = document.getElementById("plainCode").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    alert("Code copié !");
+  }).catch(err => {
+    alert("Erreur lors de la copie : " + err);
+  });
+}
+
+function copyIframe() {
+  const iframe = document.getElementById("iframeOutput").textContent;
+  navigator.clipboard.writeText(iframe).then(() => {
+    alert("Iframe copié !");
+  }).catch(err => {
+    alert("Erreur lors de la copie : " + err);
+  });
+}
+</script>
+</body>
+</html>
