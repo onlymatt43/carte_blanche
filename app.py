@@ -1,12 +1,15 @@
+
+from flask import Flask, request, jsonify, render_template, redirect
+import os
+import hashlib
+import time
+from urllib.parse import urlparse
+from flask import Flask, request, render_template, make_response, redirect
 import json, hashlib, time
 from datetime import datetime, timedelta
 
 from flask_cors import CORS
 app = Flask(__name__)
-@app.before_request
-def enforce_https():
-    if request.headers.get("X-Forwarded-Proto", "http") != "https":
-        return redirect(request.url.replace("http://", "https://", 1), code=301)
 CORS(app)
 TOKEN_FILE = "product_catalog.json"
 
@@ -110,15 +113,3 @@ def unlock():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-@app.route("/purge_expired", methods=["POST"])
-def purge_expired():
-    data = load_tokens()
-    now = time.time()
-    updated = {
-        k: v for k, v in data.items()
-        if v.get("expires", now + 1) > now
-    }
-    with open("product_catalog.json", "w") as f:
-        json.dump(updated, f, indent=2)
-    return f"{len(data) - len(updated)} token(s) supprimé(s)", 200
