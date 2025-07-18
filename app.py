@@ -59,15 +59,15 @@ def add_token():
 def unlock():
     token = request.args.get('token')
     if not token:
-        return "Token missing", 400
+        return render_template("unlock.html", unlocked=False)
 
     cookie_token = request.cookies.get("access_token")
     if cookie_token != token:
-        return "Access denied: token mismatch", 403
+        return render_template("unlock.html", unlocked=False)
 
     tokens = load_tokens()
     if token not in tokens:
-        return "Invalid token", 403
+        return render_template("unlock.html", unlocked=False)
 
     token_data = tokens[token]
     client_ip = request.remote_addr
@@ -76,9 +76,11 @@ def unlock():
         token_data["ip"] = client_ip
         save_tokens(tokens)
     elif token_data["ip"] != client_ip:
-        return "Access denied: IP mismatch", 403
+        return render_template("unlock.html", unlocked=False)
 
-    return make_response(render_template("unlock.html", link=token_data["link"]))
+    response = make_response(render_template("unlock.html", link=token_data["link"], unlocked=True))
+    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60, samesite="None", secure=True)
+    return response
 
 @app.route('/validate_code', methods=['POST'])
 def validate_code():
@@ -107,7 +109,7 @@ def validate_code():
         return jsonify({'error': 'IP mismatch'}), 403
 
     response = jsonify({'ok': True})
-    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60)
+    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60, samesite="None", secure=True)
     return response
 
 @app.route('/codes', methods=['GET'])
@@ -124,9 +126,6 @@ def get_code_mappings():
 @app.route('/')
 def home():
     return render_template("index.html")
-
-if __name__ == '__main__':
-    app.run(debug=True)
 
 @app.route('/index')
 def show_index():
