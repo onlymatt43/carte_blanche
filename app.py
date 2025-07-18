@@ -1,115 +1,142 @@
 
-from flask import Flask, request, jsonify, render_template, redirect
-import os
-import hashlib
-import time
-from urllib.parse import urlparse
-from flask import Flask, request, render_template, make_response, redirect
-import json, hashlib, time
-from datetime import datetime, timedelta
-
+from flask import Flask, request, jsonify, render_template, make_response
 from flask_cors import CORS
+import hashlib
+import json
+import os
+
 app = Flask(__name__)
 CORS(app)
-TOKEN_FILE = "product_catalog.json"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CATALOG_FILE = os.path.join(BASE_DIR, 'product_catalog.json')
 
 def load_tokens():
-    with open(TOKEN_FILE, "r") as f:
+    if not os.path.exists(CATALOG_FILE):
+        return {}
+    with open(CATALOG_FILE, 'r') as f:
         return json.load(f)
 
-def save_tokens(tokens):
-    with open(TOKEN_FILE, "w") as f:
+
+TOKEN_STORE_FILE = os.path.join(BASE_DIR, 'token_store.json')
+
+def save_code_mapping(visible_code, hashed_token):
+    if not os.path.exists(TOKEN_STORE_FILE):
+        store = {}
+    else:
+        with open(TOKEN_STORE_FILE, 'r') as f:
+            try:
+                store = json.load(f)
+            except:
+                store = {}
+
+    store[visible_code] = hashed_token
+    with open(TOKEN_STORE_FILE, 'w') as f:
+        json.dump(store, f, indent=4)
+
+
+def save_tokens(tokens)
+    if visible_code: save_code_mapping(visible_code, token):
+    with open(CATALOG_FILE, 'w') as f:
         json.dump(tokens, f, indent=4)
-
-def hash_token(token):
-    return hashlib.sha256(token.encode()).hexdigest()
-
-def is_token_valid(token, ip):
-    tokens = load_tokens()
-    token_hash = hash_token(token)
-    record = tokens.get(token_hash)
-
-    if not record: return None
-    if "ip" in record and record["ip"] != ip: return None
-
-    if "ip" not in record:
-        record["ip"] = ip
-        tokens[token_hash] = record
-        save_tokens(tokens)
-
-    expires = record.get("expires")
-    if expires and time.time() > expires: return None
-    return record.get("link")
-
-@app.after_request
-def set_secure_headers(response):
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
-    return response
-
-@app.route("/")
-def index():
-    return render_template("index.html")
 
 @app.route('/add_token', methods=['POST'])
 def add_token():
-    new_data = request.get_json()
-    if not new_data:
-        return jsonify({"error": "Aucune donnée reçue"}), 400
+    data = request.json
+    token = data.get('token')
+    visible_code = data.get('code')
+    duration = data.get('duration')
+    link = data.get('link')
+    if not token or not duration or not link:
+        return jsonify({'error': 'Missing fields'}), 400
+    tokens = load_tokens()
+    tokens[token] = {'duration': duration, 'link': link, 'ip': None}
+    save_tokens(tokens)
+    if visible_code: save_code_mapping(visible_code, token)
+    return jsonify({token: tokens[token]}), 200
 
-    try:
-        with open('product_catalog.json', 'r+') as f:
-            data = json.load(f)
-            data.update(new_data)
-            f.seek(0)
-            json.dump(data, f, indent=2)
-            f.truncate()
-        return jsonify({"status": "success"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/unlock', methods=['GET', 'POST'])
+@app.route('/unlock', methods=['GET'])
 def unlock():
-    if request.method == 'POST':
-        submitted_token = request.form.get('token', '').strip()
-        client_ip = request.remote_addr
-        referer = request.headers.get('Referer', '')
+    token = request.args.get('token')
+    if not token:
+        return "Token missing", 400
 
-        if not submitted_token:
-            return render_template('unlock.html', error="Code requis.")
+    # Check if token in cookie matches
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token != token:
+        return "Access denied: token mismatch", 403
 
-        with open('product_catalog.json', 'r') as f:
-            catalog = json.load(f)
+    tokens = load_tokens()
+    if token not in tokens:
+        return "Invalid token", 403
+    token_data = tokens[token]
+    client_ip = request.remote_addr
 
-        hashed_submitted = hashlib.sha256(submitted_token.encode()).hexdigest()
+    # Check IP binding
+    if token_data["ip"] is None:
+        token_data["ip"] = client_ip  # First time use → bind IP
+        save_tokens(tokens)
+    if visible_code: save_code_mapping(visible_code, token)
+    elif token_data["ip"] != client_ip:
+        return "Access denied: IP mismatch", 403
 
-        for entry in catalog:
-            if entry['hashed_token'] == hashed_submitted:
-                # Vérifie domaine autorisé (si "url" est présent)
-                token_url = entry.get('url')
-                if token_url:
-                    domain_expected = urlparse(token_url).netloc
-                    domain_actual = urlparse(referer).netloc
-                    if domain_expected != domain_actual:
-                        return render_template('unlock.html', error="Ce site n'est pas autorisé.")
+    # Mark IP address (optional, not enforced here)
+    client_ip = request.remote_addr
+    token_data['ip'] = client_ip
+    save_tokens(tokens)
+    if visible_code: save_code_mapping(visible_code, token)
 
-                # Vérifie et enregistre IP
-                if 'ip' not in entry:
-                    entry['ip'] = client_ip
-                    with open('product_catalog.json', 'w') as f:
-                        json.dump(catalog, f, indent=2)
-                elif entry['ip'] != client_ip:
-                    return render_template('unlock.html', error="Ce code est déjà utilisé sur un autre réseau.")
+    # Set access cookie
+    response = make_response(render_template("unlock.html", link=token_data["link"]))
+    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60)
+    return response
 
-                # Tout est bon : set-cookie et redirect
-                response = make_response(redirect('/'))
-                duration = entry.get("duration_seconds", 3600)
-                response.set_cookie('access_token', submitted_token, max_age=duration, httponly=True)
-                return response
-
-        return render_template('unlock.html', error="Code invalide.")
-    
-    return render_template('unlock.html')
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
+
+
+@app.route('/validate_code', methods=['POST'])
+def validate_code():
+    data = request.json
+    token = data.get('token')
+    visible_code = data.get('code')  # From URL
+    code = data.get('code')    # From input
+
+    if not token or not code:
+        return jsonify({'error': 'Missing input'}), 400
+
+    # Compute SHA-256 hash of the entered code
+    hashed_code = hashlib.sha256(code.encode()).hexdigest()
+
+    # Compare with the expected token
+    if hashed_code != token:
+        return jsonify({'error': 'Invalid code'}), 403
+
+    tokens = load_tokens()
+    if token not in tokens:
+        return jsonify({'error': 'Token not found'}), 404
+
+    client_ip = request.remote_addr
+    token_data = tokens[token]
+
+    if token_data["ip"] is None:
+        token_data["ip"] = client_ip
+        save_tokens(tokens)
+    if visible_code: save_code_mapping(visible_code, token)
+    elif token_data["ip"] != client_ip:
+        return jsonify({'error': 'IP mismatch'}), 403
+
+    response = jsonify({'ok': True})
+    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60)
+    return response
+
+@app.route('/codes', methods=['GET'])
+def get_code_mappings():
+    if not os.path.exists(TOKEN_STORE_FILE):
+        return jsonify({})
+    with open(TOKEN_STORE_FILE, 'r') as f:
+        try:
+            store = json.load(f)
+            return jsonify(store)
+        except:
+            return jsonify({'error': 'Invalid JSON'}), 500

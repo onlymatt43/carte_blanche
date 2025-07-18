@@ -1,9 +1,117 @@
 
 <!DOCTYPE html>
-<html>
-<head><title>Access Granted</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Secure Access</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      height: 100vh;
+      background: #000;
+      overflow: hidden;
+      position: relative;
+      color: white;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transition: opacity 2s ease;
+      z-index: 10;
+    }
+
+    .overlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay input {
+      margin-top: 1em;
+      padding: 0.5em;
+      font-size: 1em;
+    }
+
+    .overlay button {
+      margin-top: 0.5em;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      background: #0ff;
+      border: none;
+      cursor: pointer;
+    }
+
+    .overlay a {
+      margin-top: 2em;
+      color: #0ff;
+      text-decoration: none;
+      font-size: 1.2em;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .content a {
+      color: #0f0;
+      font-size: 1.5em;
+    }
+  </style>
+</head>
 <body>
-  <h1>✅ Access Unlocked</h1>
-  <p>Here is your link: <a href="{{ link }}" target="_blank">{{ link }}</a></p>
+
+<div class="overlay" id="glass">
+  <h1>Get your Carte Blanche here</h1>
+  <input type="text" id="codeInput" placeholder="Enter your code">
+  <button onclick="submitCode()">Unlock</button>
+  <a href="#" target="_blank">Go to Merchant</a>
+</div>
+
+<div class="content">
+  <h1>Access Granted</h1>
+  <a href="{{ link }}" target="_blank">Open Content</a>
+</div>
+
+<script>
+  function submitCode() {
+    const code = document.getElementById('codeInput').value;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    fetch("/validate_code", {
+      method: "POST",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: token, code: code})
+    })
+    .then(response => {
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert("Invalid code");
+      }
+    });
+  }
+
+  const unlocked = {{ 'true' if unlocked else 'false' }};
+  if (unlocked) {
+    setTimeout(() => {
+      document.getElementById('glass').classList.add('fade-out');
+    }, 300);
+  }
+</script>
+
 </body>
 </html>
