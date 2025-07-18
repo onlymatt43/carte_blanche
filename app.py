@@ -35,7 +35,7 @@ def save_code_mapping(visible_code, hashed_token):
         json.dump(store, f, indent=4)
 
 
-def save_tokens(tokens)
+def save_tokens(tokens):
     if visible_code: save_code_mapping(visible_code, token):
     with open(CATALOG_FILE, 'w') as f:
         json.dump(tokens, f, indent=4)
