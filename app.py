@@ -4,7 +4,9 @@ from flask import Flask, request, render_template, make_response, redirect
 import json, hashlib, time
 from datetime import datetime, timedelta
 
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 TOKEN_FILE = "product_catalog.json"
 
 def load_tokens():
