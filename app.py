@@ -85,22 +85,33 @@ def unlock():
 @app.route('/validate_code', methods=['POST'])
 def validate_code():
     data = request.json
-    token = data.get('token')
-    code = data.get('code')
+    token_from_url = data.get('token')
+    code_entered = data.get('code')
 
-    if not token or not code:
+    if not token_from_url or not code_entered:
         return jsonify({'error': 'Missing input'}), 400
 
-    hashed_code = hashlib.sha256(code.encode()).hexdigest()
-    if hashed_code != token:
+    if not os.path.exists(TOKEN_STORE_FILE):
+        return jsonify({'error': 'No token store'}), 403
+    with open(TOKEN_STORE_FILE, 'r') as f:
+        try:
+            code_map = json.load(f)
+        except:
+            return jsonify({'error': 'Invalid token store'}), 500
+
+    if code_entered not in code_map:
         return jsonify({'error': 'Invalid code'}), 403
 
+    resolved_token = code_map[code_entered]
+    if resolved_token != token_from_url:
+        return jsonify({'error': 'Token mismatch'}), 403
+
     tokens = load_tokens()
-    if token not in tokens:
+    if resolved_token not in tokens:
         return jsonify({'error': 'Token not found'}), 404
 
     client_ip = request.remote_addr
-    token_data = tokens[token]
+    token_data = tokens[resolved_token]
 
     if token_data["ip"] is None:
         token_data["ip"] = client_ip
@@ -109,7 +120,7 @@ def validate_code():
         return jsonify({'error': 'IP mismatch'}), 403
 
     response = jsonify({'ok': True})
-    response.set_cookie("access_token", token, max_age=int(token_data["duration"]) * 60, samesite="None", secure=True)
+    response.set_cookie("access_token", resolved_token, max_age=int(token_data["duration"]) * 60, samesite="None", secure=True)
     return response
 
 @app.route('/codes', methods=['GET'])
