@@ -13,6 +13,9 @@
 <body>
   <h2>🔐 Secure Token Generator</h2>
 
+  <label>Admin Code:</label><br>
+  <input type="text" id="adminCode" placeholder="Enter admin code"><br><br>
+
   <label>Gift Code (e.g., ABC123):</label><br>
   <input type="text" id="code" placeholder="Visible Code"><br>
 
@@ -46,9 +49,10 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
   const code = document.getElementById("code").value.trim();
   const link = document.getElementById("link").value.trim();
   const durationMinutes = parseInt(document.getElementById("duration").value.trim());
+  const adminCode = document.getElementById("adminCode").value.trim();
   const duration = durationMinutes;
 
-  if (!code || !link || isNaN(duration)) {
+  if (!code || !link || isNaN(duration) || !adminCode) {
     alert("All fields are required.");
     return;
   }
@@ -56,6 +60,7 @@ document.getElementById("generateBtn").addEventListener("click", async () => {
   const hashedToken = await generateSHA256(code);
 
   const payload = {
+    admin_code: adminCode,
     token: hashedToken,
     link,
     duration,
