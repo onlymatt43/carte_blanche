@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CARTE BLANCHE</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: 'Helvetica Neue', sans-serif;
+      background: transparent;
+      overflow: hidden;
+    }
+    .overlay {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      backdrop-filter: blur(10px);
+      background-color: rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .card {
+      background: white; padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 25px 40px rgba(0, 0, 0, 0.2);
+      text-align: center; width: 320px;
+      animation: float 6s ease-in-out infinite;
+    }
+    .card h1 {
+      margin-bottom: 20px; font-size: 1.4em;
+      font-weight: 600; letter-spacing: 0.15em; color: #111;
+    }
+    .card input {
+      padding: 12px; width: 100%;
+      font-size: 1em; border: 1px solid #ccc;
+      border-radius: 6px; margin-bottom: 16px;
+    }
+    .card button {
+      background: black; color: white;
+      border: none; padding: 12px 28px;
+      font-size: 1em; border-radius: 6px;
+      cursor: pointer; transition: background 0.3s ease;
+    }
+    .card button:hover { background: #333; }
+    @keyframes float {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+      100% { transform: translateY(0); }
+    }
+    .fade-out { opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
+    .content {
+      position: relative; z-index: 1; height: 100%;
+      display: flex; align-items: center;
+      justify-content: center; flex-direction: column; color: #000;
+    }
+    .content a {
+      font-size: 1.4em; color: #000;
+      text-decoration: none; margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="overlay" id="glass">
+  <div class="card">
+    <h1>CARTE BLANCHE</h1>
+    <input type="text" id="codeInput" placeholder="Enter code">
+    <button onclick="submitCode()">FIND ONE</button>
+  </div>
+</div>
+
+<div class="content" id="content" style="display:none;">
+  <h2>Access Granted</h2>
+  <a id="secureLink" href="#" target="_blank">Open Content</a>
+</div>
+
+<script>
+  function submitCode() {
+    const code = document.getElementById("codeInput").value;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    fetch("/validate_code", {
+      method: "POST",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: token, code: code})
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.link) {
+        document.getElementById('glass').classList.add('fade-out');
+        document.getElementById('content').style.display = 'flex';
+        document.getElementById('secureLink').href = data.link;
+      } else {
+        alert("Invalid code");
+      }
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel - Carte Blanche</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    h2 { margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background: #eee; }
+    button { padding: 6px 12px; background: red; color: white; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>🛠️ Admin Panel – Token Management</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Visible Code</th>
+        <th>Token (SHA)</th>
+        <th>Link</th>
+        <th>Duration</th>
+        <th>IP</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for token, data in tokens.items() %}
+      <tr>
+        <td>{{ codes.get(token, '—') }}</td>
+        <td>{{ token }}</td>
+        <td>{{ data.link }}</td>
+        <td>{{ data.duration }} min</td>
+        <td>{{ data.ip or '—' }}</td>
+        <td>
+          <form method="POST" action="/delete_token" onsubmit="return confirm('Delete this token?')">
+            <input type="hidden" name="token" value="{{ token }}">
+            <button type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

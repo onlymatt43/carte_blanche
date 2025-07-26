@@ -1,0 +1,86 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🔐 Secure Token Generator</title>
+  <style>
+    body { background:#333; color:#fff; font-family:sans-serif; padding:20px; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; font-size: 1em; }
+    pre { background:#111; padding:10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>🔐 Secure Token Generator</h2>
+
+  <label>Gift Code (e.g., ABC123):</label><br>
+  <input type="text" id="code" placeholder="Visible Code"><br>
+
+  <label>Destination Link:</label><br>
+  <input type="text" id="link" placeholder="https://example.com/unlock"><br>
+
+  <label>Duration (minutes):</label><br>
+  <input type="number" id="duration" value="10"><br>
+
+  <button id="generateBtn">Generate Token</button>
+
+  <strong>Code to Give:</strong>
+  <pre id="plainCode"></pre>
+
+  <strong>Generated Iframe:</strong>
+  <pre id="iframeOutput"></pre>
+
+  <strong>Payload Sent:</strong>
+  <pre id="jsonOutput"></pre>
+
+<script>
+async function generateSHA256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  const code = document.getElementById("code").value.trim();
+  const link = document.getElementById("link").value.trim();
+  const durationMinutes = parseInt(document.getElementById("duration").value.trim());
+  const duration = durationMinutes;
+
+  if (!code || !link || isNaN(duration)) {
+    alert("All fields are required.");
+    return;
+  }
+
+  const hashedToken = await generateSHA256(code);
+
+  const payload = {
+    token: hashedToken,
+    link,
+    duration,
+    code
+  };
+
+  try {
+    const response = await fetch("/add_token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const iframeCode = `<iframe src="/unlock?token=${hashedToken}" width="100%" height="100%" style="border:none; min-height:100vh;"></iframe>`;
+
+    document.getElementById("plainCode").textContent = code;
+    document.getElementById("iframeOutput").textContent = iframeCode;
+    document.getElementById("jsonOutput").textContent = JSON.stringify(payload, null, 2);
+
+  } catch (err) {
+    alert("Error sending to server: " + err.message);
+  }
+});
+</script>
+</body>
+</html>
